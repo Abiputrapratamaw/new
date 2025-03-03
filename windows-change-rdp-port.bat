@@ -2,6 +2,22 @@
 mode con cp select=437 >nul
 setlocal enabledelayedexpansion
 
+:: Cek apakah berjalan sebagai administrator
+NET SESSION >nul 2>&1
+if %errorLevel% neq 0 (
+    echo Script ini membutuhkan hak administrator!
+    echo Mengaktifkan permintaan hak administrator...
+    
+    :: Membuat file VBS sementara untuk mendapatkan hak admin
+    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
+    echo UAC.ShellExecute "%~s0", "", "", "runas", 1 >> "%temp%\getadmin.vbs"
+    
+    :: Jalankan file VBS dan keluar dari script saat ini
+    "%temp%\getadmin.vbs"
+    del "%temp%\getadmin.vbs"
+    exit /B
+)
+
 rem Set RDP Port
 set RdpPort=3389
 rem set RdpPort=3333
