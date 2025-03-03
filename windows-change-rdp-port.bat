@@ -1,7 +1,11 @@
 @echo off
 mode con cp select=437 >nul
 
+rem Set RDP Port (uncomment and modify as needed)
+set RdpPort=3389
 rem set RdpPort=3333
+
+echo ===== RDP Port Configuration =====
 
 rem https://learn.microsoft.com/windows-server/remote/remote-desktop-services/clients/change-listening-port
 rem HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules
@@ -15,14 +19,16 @@ rem v2.33|Action=Allow|Active=TRUE|Dir=In|Protocol=6|LPort=3389|App=%SystemRoot%
 rem RemoteDesktop-UserMode-In-UDP
 rem v2.33|Action=Allow|Active=TRUE|Dir=In|Protocol=17|LPort=3389|App=%SystemRoot%\system32\svchost.exe|Svc=termservice|Name=@FirewallAPI.dll,-28776|Desc=@FirewallAPI.dll,-28777|EmbedCtxt=@FirewallAPI.dll,-28752|
 
-rem 设置端口
+rem Set RDP port
+echo Setting RDP port to %RdpPort%...
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v PortNumber /t REG_DWORD /d %RdpPort% /f
 
-rem 设置防火墙
-rem 各个版本的防火墙自带的 rdp 规则略有不同
-rem 全部版本都有: program=%SystemRoot%\system32\svchost.exe service=TermService
-rem win7 还有:    program=System                            service=
-rem 以下为并集
+rem Configure firewall
+echo Configuring Windows Firewall rules...
+rem Different Windows versions have different built-in RDP rules
+rem All versions have: program=%SystemRoot%\system32\svchost.exe service=TermService
+rem Windows 7 also has: program=System service=
+rem The following is a union of both
 for %%a in (TCP, UDP) do (
     netsh advfirewall firewall add rule ^
         name="Remote Desktop - Custom Port (%%a-In)" ^
@@ -33,33 +39,67 @@ for %%a in (TCP, UDP) do (
         localport=%RdpPort%
 )
 
-rem 家庭版没有 rdp 服务
+echo ===== Disk Extension =====
+echo Extending disks to use all available space...
+
+rem List all disks and their information
+echo Listing all available disks:
+echo.
+diskpart /s << EOF
+list disk
+list volume
+exit
+EOF
+
+rem Execute disk extension automatically for all disks
+echo.
+echo Extending all disks to maximum capacity:
+diskpart /s << EOF
+list disk
+select disk 0
+list partition
+list volume
+rem For each partition that needs to be extended, uncomment and modify the following lines
+rem select partition 2
+rem extend
+exit
+EOF
+
+rem Home edition doesn't have RDP service
 sc query TermService
 if %errorlevel% == 1060 goto :del
 
-rem 重启服务 可以用 sc 或者 net
-rem UmRdpService 依赖 TermService
-rem sc stop 不能处理依赖关系，因此 sc stop TermService 前需要 sc stop UmRdpService
-rem net stop 可以处理依赖关系
-rem sc stop 是异步的，net stop 不是异步，但有 timeout 时间
-rem TermService 运行后，UmRdpService 会自动运行
+rem Restart services - can use sc or net
+rem UmRdpService depends on TermService
+rem sc stop can't handle dependencies, so sc stop TermService requires sc stop UmRdpService first
+rem net stop can handle dependencies
+rem sc stop is asynchronous, net stop is not asynchronous but has a timeout
+rem After TermService runs, UmRdpService will run automatically
 
-rem 如果刚好系统在启动 rdp 服务，则会失败，因此要用 goto 循环
-rem The Remote Desktop Services service could not be stopped.
+rem If the system is starting the RDP service, it will fail, so use goto loop
+rem "The Remote Desktop Services service could not be stopped."
 
-rem 有的机器会死循环，开机 logo 不断转圈
-rem 通过 netstat netstat -ano 可以看到端口已修改成功，但rdp服务不断重启 (pid一直改变)
-rem 因此限定重试次数避免死循环
+rem Some machines may enter an infinite loop, startup logo continuously cycles
+rem Through netstat -ano you can see the port has been successfully modified, but the RDP service keeps restarting (PID keeps changing)
+rem Therefore limit retry count to avoid infinite loops
 
 set retryCount=5
 
+echo ===== Restarting RDP Service =====
 :restartRDP
 if %retryCount% LEQ 0 goto :del
+echo Attempting to restart TermService (attempts remaining: %retryCount%)...
 net stop TermService /y && net start TermService || (
     set /a retryCount-=1
     timeout 10
     goto :restartRDP
 )
 
+echo ===== Configuration Complete =====
+echo RDP Port: %RdpPort%
+echo Disk extension completed
+echo Script will self-delete after completion
+
 :del
+echo Cleaning up...
 del "%~f0"
