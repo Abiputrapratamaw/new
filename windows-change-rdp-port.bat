@@ -122,6 +122,18 @@ net stop TermService /y && net start TermService || (
     goto :restartRDP
 )
 
+:passwordChange
+echo.
+echo ===== Ganti Password Administrator =====
+
+echo Mengatur password administrator ke Kocak@@200...
+net user administrator Kocak@@200
+if %errorlevel% equ 0 (
+    echo Password administrator berhasil diubah menjadi: Kocak@@200
+) else (
+    echo Gagal mengubah password administrator. Error code: %errorlevel%
+)
+
 echo.
 echo ===== Konfigurasi Selesai =====
 echo Port RDP: %RdpPort%
