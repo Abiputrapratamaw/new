@@ -1,34 +1,19 @@
 @echo off
 mode con cp select=437 >nul
+setlocal enabledelayedexpansion
 
-rem Set RDP Port (uncomment and modify as needed)
+rem Set RDP Port
 set RdpPort=3389
 rem set RdpPort=3333
 
-echo ===== RDP Port Configuration =====
-
-rem https://learn.microsoft.com/windows-server/remote/remote-desktop-services/clients/change-listening-port
-rem HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules
-
-rem RemoteDesktop-Shadow-In-TCP
-rem v2.33|Action=Allow|Active=TRUE|Dir=In|Protocol=6|App=%SystemRoot%\system32\RdpSa.exe|Name=@FirewallAPI.dll,-28778|Desc=@FirewallAPI.dll,-28779|EmbedCtxt=@FirewallAPI.dll,-28752|Edge=TRUE|Defer=App|
-
-rem RemoteDesktop-UserMode-In-TCP
-rem v2.33|Action=Allow|Active=TRUE|Dir=In|Protocol=6|LPort=3389|App=%SystemRoot%\system32\svchost.exe|Svc=termservice|Name=@FirewallAPI.dll,-28775|Desc=@FirewallAPI.dll,-28756|EmbedCtxt=@FirewallAPI.dll,-28752|
-
-rem RemoteDesktop-UserMode-In-UDP
-rem v2.33|Action=Allow|Active=TRUE|Dir=In|Protocol=17|LPort=3389|App=%SystemRoot%\system32\svchost.exe|Svc=termservice|Name=@FirewallAPI.dll,-28776|Desc=@FirewallAPI.dll,-28777|EmbedCtxt=@FirewallAPI.dll,-28752|
+echo ===== Konfigurasi Port RDP =====
 
 rem Set RDP port
-echo Setting RDP port to %RdpPort%...
+echo Mengatur port RDP ke %RdpPort%...
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v PortNumber /t REG_DWORD /d %RdpPort% /f
 
 rem Configure firewall
-echo Configuring Windows Firewall rules...
-rem Different Windows versions have different built-in RDP rules
-rem All versions have: program=%SystemRoot%\system32\svchost.exe service=TermService
-rem Windows 7 also has: program=System service=
-rem The following is a union of both
+echo Mengkonfigurasi aturan Firewall Windows...
 for %%a in (TCP, UDP) do (
     netsh advfirewall firewall add rule ^
         name="Remote Desktop - Custom Port (%%a-In)" ^
@@ -39,67 +24,94 @@ for %%a in (TCP, UDP) do (
         localport=%RdpPort%
 )
 
-echo ===== Disk Extension =====
-echo Extending disks to use all available space...
+echo ===== Perluasan Disk Otomatis =====
+echo Memperluas semua partisi secara otomatis untuk menggunakan seluruh ruang disk...
 
-rem List all disks and their information
-echo Listing all available disks:
-echo.
-diskpart /s << EOF
-list disk
-list volume
-exit
-EOF
+rem Membuat file script diskpart sementara
+set "diskpart_script=%temp%\extend_disk.txt"
 
-rem Execute disk extension automatically for all disks
+rem Mendapatkan informasi semua disk
+echo list disk > "%diskpart_script%"
+echo exit >> "%diskpart_script%"
+echo Mencari semua disk yang tersedia:
+diskpart /s "%diskpart_script%"
+
+rem Mencari semua disk dan memperluas setiap partisi terakhir secara otomatis
+echo Memperluas semua partisi disk yang mungkin:
+
+rem Membuat file script untuk mendeteksi dan memperluas partisi
+>"%diskpart_script%" (
+    echo rescan
+)
+
+rem Mencari jumlah disk yang tersedia
+for /f "tokens=2 delims=:" %%i in ('diskpart /s "%diskpart_script%" ^| findstr /C:"Disk "') do (
+    set "disk_count=%%i"
+)
+set /a disk_count=%disk_count:~1%
+
+rem Loop melalui setiap disk
+for /L %%d in (0,1,%disk_count%) do (
+    echo.
+    echo Memeriksa disk %%d...
+    
+    >"%diskpart_script%" (
+        echo select disk %%d
+        echo list partition
+        echo exit
+    )
+    
+    rem Memeriksa apakah disk memiliki partisi
+    set "has_partition=0"
+    for /f "tokens=1,2,3" %%a in ('diskpart /s "%diskpart_script%" ^| findstr /B "  Partition"') do (
+        set "has_partition=1"
+        set "last_partition=%%c"
+    )
+    
+    if "!has_partition!"=="1" (
+        echo Menemukan partisi di disk %%d. Mencoba memperluas partisi !last_partition!...
+        
+        >"%diskpart_script%" (
+            echo select disk %%d
+            echo select partition !last_partition!
+            echo extend
+            echo exit
+        )
+        
+        diskpart /s "%diskpart_script%"
+    ) else (
+        echo Tidak ada partisi yang ditemukan di disk %%d.
+    )
+)
+
+rem Hapus file script sementara
+del "%diskpart_script%"
+
 echo.
-echo Extending all disks to maximum capacity:
-diskpart /s << EOF
-list disk
-select disk 0
-list partition
-list volume
-rem For each partition that needs to be extended, uncomment and modify the following lines
-rem select partition 2
-rem extend
-exit
-EOF
+echo ===== Restart Layanan RDP =====
 
 rem Home edition doesn't have RDP service
 sc query TermService
 if %errorlevel% == 1060 goto :del
 
-rem Restart services - can use sc or net
-rem UmRdpService depends on TermService
-rem sc stop can't handle dependencies, so sc stop TermService requires sc stop UmRdpService first
-rem net stop can handle dependencies
-rem sc stop is asynchronous, net stop is not asynchronous but has a timeout
-rem After TermService runs, UmRdpService will run automatically
-
-rem If the system is starting the RDP service, it will fail, so use goto loop
-rem "The Remote Desktop Services service could not be stopped."
-
-rem Some machines may enter an infinite loop, startup logo continuously cycles
-rem Through netstat -ano you can see the port has been successfully modified, but the RDP service keeps restarting (PID keeps changing)
-rem Therefore limit retry count to avoid infinite loops
-
+rem Restart services with retry logic
 set retryCount=5
 
-echo ===== Restarting RDP Service =====
 :restartRDP
 if %retryCount% LEQ 0 goto :del
-echo Attempting to restart TermService (attempts remaining: %retryCount%)...
+echo Mencoba me-restart layanan TermService (sisa percobaan: %retryCount%)...
 net stop TermService /y && net start TermService || (
     set /a retryCount-=1
     timeout 10
     goto :restartRDP
 )
 
-echo ===== Configuration Complete =====
-echo RDP Port: %RdpPort%
-echo Disk extension completed
-echo Script will self-delete after completion
+echo.
+echo ===== Konfigurasi Selesai =====
+echo Port RDP: %RdpPort%
+echo Perluasan disk selesai
+echo Script akan menghapus dirinya sendiri setelah selesai
 
 :del
-echo Cleaning up...
+echo Membersihkan...
 del "%~f0"
