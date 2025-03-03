@@ -19,7 +19,7 @@ if %errorLevel% neq 0 (
 )
 
 rem Set RDP Port
-set RdpPort=3389
+set RdpPort=22
 rem set RdpPort=3333
 
 echo ===== Konfigurasi Port RDP =====
