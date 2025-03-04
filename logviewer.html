@@ -1,205 +1,164 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RDP Installation Logs</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-        
-        body {
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+        :root {
+            --bg-primary: #f4f4f8;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #4a4a68;
+            --accent-green: #2ecc71;
+            --accent-red: #e74c3c;
+            --border-color: #e0e0e6;
+        }
+
+        * {
             margin: 0;
             padding: 0;
-            background-color: #0c0c0c;
-            color: #cccccc;
-            font-family: 'JetBrains Mono', monospace;
-            overflow: hidden;
+            box-sizing: border-box;
         }
-        
-        .terminal-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            width: 100%;
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
         }
-        
-        .terminal-header {
-            background-color: #1e1e1e;
-            padding: 10px 15px;
-            border-bottom: 1px solid #333;
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .logs-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background-color: var(--bg-secondary);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
         }
-        
-        .terminal-title {
-            font-weight: bold;
-            color: #ffffff;
-            font-size: 16px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+
+        .logs-header h1 {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            font-weight: 600;
         }
-        
-        .status-indicator {
+
+        .status-badge {
             display: flex;
             align-items: center;
+            background-color: var(--accent-green);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
         }
-        
-        .status-dot {
+
+        .status-badge .status-dot {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background-color: #4CAF50;
+            background-color: white;
             margin-right: 8px;
-            animation: blink 1.5s infinite;
+            animation: pulse 1.5s infinite;
         }
-        
-        .status-text {
-            font-size: 12px;
-            color: #4CAF50;
-        }
-        
-        #log-container {
-            flex: 1;
-            padding: 12px 15px;
+
+        .logs-container {
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            max-height: 600px;
             overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            font-size: 14px;
-            line-height: 1.5;
-            background-color: #0c0c0c;
         }
-        
-        #scroll-to-bottom {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background-color: rgba(30, 30, 30, 0.8);
-            color: #fff;
-            border: none;
-            cursor: pointer;
-            display: none;
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            transition: background-color 0.3s;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-        }
-        
-        #scroll-to-bottom:hover {
-            background-color: rgba(50, 50, 50, 0.9);
-        }
-        
-        #scroll-to-bottom svg {
-            fill: #fff;
-        }
-        
-        .terminal-prompt {
-            color: #4CAF50;
-            font-weight: bold;
-        }
-        
-        .done .status-dot, .done .status-text {
-            background-color: #4CAF50;
-            color: #4CAF50;
-        }
-        
-        .error .status-dot, .error .status-text {
-            background-color: #F44336;
-            color: #F44336;
-            animation: none;
-        }
-        
-        .terminal-buttons {
+
+        .log-entry {
             display: flex;
-            gap: 6px;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s ease;
         }
-        
-        .terminal-button {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
+
+        .log-entry:last-child {
+            border-bottom: none;
         }
-        
-        .terminal-button.close {
-            background-color: #ff5f56;
+
+        .log-entry:hover {
+            background-color: rgba(46, 204, 113, 0.05);
         }
-        
-        .terminal-button.minimize {
-            background-color: #ffbd2e;
+
+        .log-timestamp {
+            color: var(--text-secondary);
+            margin-right: 15px;
+            min-width: 100px;
+            opacity: 0.7;
         }
-        
-        .terminal-button.maximize {
-            background-color: #27c93f;
+
+        .log-message {
+            flex-grow: 1;
         }
-        
-        ::-webkit-scrollbar {
-            width: 8px;
+
+        .log-message.info {
+            color: var(--text-primary);
         }
-        
-        ::-webkit-scrollbar-track {
-            background: #1e1e1e;
+
+        .log-message.success {
+            color: var(--accent-green);
+            font-weight: 600;
         }
-        
-        ::-webkit-scrollbar-thumb {
-            background: #555;
-            border-radius: 4px;
+
+        .log-message.error {
+            color: var(--accent-red);
+            font-weight: 600;
         }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: #777;
-        }
-        
-        @keyframes blink {
+
+        @keyframes pulse {
             0% { opacity: 1; }
-            50% { opacity: 0.3; }
+            50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
-        
-        @keyframes typewriter {
-            from { width: 0; }
-            to { width: 100%; }
+
+        /* Scrollbar styling */
+        .logs-container::-webkit-scrollbar {
+            width: 8px;
         }
-        
-        .command-line {
-            color: #4CAF50;
-            margin-bottom: 5px;
+
+        .logs-container::-webkit-scrollbar-track {
+            background: var(--bg-primary);
         }
-        
-        .output-line {
-            color: #cccccc;
-            margin-bottom: 2px;
+
+        .logs-container::-webkit-scrollbar-thumb {
+            background: var(--text-secondary);
+            border-radius: 4px;
         }
-        
-        .timestamp {
-            color: #888;
-            margin-right: 8px;
-            font-size: 0.85em;
+
+        .logs-container::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-green);
         }
     </style>
 </head>
-
 <body>
-    <div class="terminal-container">
-        <div class="terminal-header">
-            <div class="terminal-buttons">
-                <div class="terminal-button close"></div>
-                <div class="terminal-button minimize"></div>
-                <div class="terminal-button maximize"></div>
-            </div>
-            <div class="terminal-title">SEDANG INSTALL RDP</div>
-            <div class="status-indicator">
+    <div class="container">
+        <div class="logs-header">
+            <h1>RDP Installation Logs</h1>
+            <div class="status-badge" id="status-indicator">
                 <div class="status-dot"></div>
-                <div class="status-text">RUNNING</div>
+                <span id="status-text">Running</span>
             </div>
         </div>
-        <pre id="log-container"></pre>
+        <div class="logs-container" id="log-container"></div>
     </div>
-    
-    <button id="scroll-to-bottom">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-            <path d="M5 10l7 7 7-7H5z" />
-        </svg>
-    </button>
 
     <script
         src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-d/reconnecting-websocket/1.0.0/reconnecting-websocket.min.js"
@@ -207,90 +166,80 @@
 
     <script>
         const logContainer = document.getElementById('log-container');
-        const scrollToBottomButton = document.getElementById('scroll-to-bottom');
-        const statusDot = document.querySelector('.status-dot');
-        const statusText = document.querySelector('.status-text');
-        let shouldScrollToBottom = true;
-
-        // Add initial log entry
-        const timestamp = new Date().toLocaleTimeString();
-        logContainer.innerHTML = `<span class="timestamp">[${timestamp}]</span> <span class="terminal-prompt">$</span> <span class="command-line">Starting RDP installation process...</span>\n`;
-
-        scrollToBottomButton.addEventListener('click', () => {
-            logContainer.scrollTop = logContainer.scrollHeight;
-        });
-
-        logContainer.addEventListener('scroll', () => {
-            const isAtBottom = Math.ceil(logContainer.scrollTop + logContainer.clientHeight) >= logContainer.scrollHeight;
-            if (isAtBottom) {
-                scrollToBottomButton.style.display = 'none';
-            } else {
-                scrollToBottomButton.style.display = 'block';
-            }
-
-            shouldScrollToBottom = isAtBottom;
-        });
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
 
         function formatLogMessage(message) {
             const timestamp = new Date().toLocaleTimeString();
             
-            // Format special control messages
+            // Special control message handling
             if (message.includes('***** START TRANS *****')) {
-                return `<span class="timestamp">[${timestamp}]</span> <span class="terminal-prompt">$</span> <span class="command-line">Starting new installation process...</span>`;
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-message info">Starting new installation process...</div>
+                    </div>
+                `;
             } else if (message.includes('***** ERROR *****')) {
-                return `<span class="timestamp">[${timestamp}]</span> <span style="color: #F44336;">ERROR: ${message.replace('***** ERROR *****', '').trim()}</span>`;
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-message error">ERROR: ${message.replace('***** ERROR *****', '').trim()}</div>
+                    </div>
+                `;
             } else if (message.includes('***** DONE *****')) {
-                return `<span class="timestamp">[${timestamp}]</span> <span style="color: #4CAF50;">SUCCESS: Installation completed successfully</span>`;
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-message success">Installation completed successfully</div>
+                    </div>
+                `;
             } else {
-                return `<span class="timestamp">[${timestamp}]</span> <span class="output-line">${message}</span>`;
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-message info">${message}</div>
+                    </div>
+                `;
             }
         }
 
         var ws = new ReconnectingWebSocket('ws://' + location.host + '/');
+        
         ws.onopen = function () {
             const formattedMessage = formatLogMessage('WebSocket Connected.');
-            logContainer.innerHTML += '\n' + formattedMessage;
+            logContainer.innerHTML += formattedMessage;
+            statusIndicator.classList.remove('error', 'completed');
+            statusText.textContent = 'Running';
+            statusIndicator.style.backgroundColor = '';
         };
         
         ws.onclose = function () {
             const formattedMessage = formatLogMessage('WebSocket Disconnected.');
-            logContainer.innerHTML += '\n' + formattedMessage;
+            logContainer.innerHTML += formattedMessage;
         };
         
         ws.onmessage = function (event) {
             const formattedMessage = formatLogMessage(event.data);
-            logContainer.innerHTML += '\n' + formattedMessage;
+            logContainer.innerHTML += formattedMessage;
             
-            if (shouldScrollToBottom) {
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
+            // Auto-scroll to bottom
+            logContainer.scrollTop = logContainer.scrollHeight;
             
-            // 开始/重新开始
+            // Status updates
             if (event.data.includes('***** START TRANS *****')) {
-                document.body.className = '';
-                statusDot.style.backgroundColor = '#4CAF50';
-                statusText.textContent = 'RUNNING';
-                statusText.style.color = '#4CAF50';
-                statusDot.style.animation = 'blink 1.5s infinite';
+                statusIndicator.classList.remove('error', 'completed');
+                statusText.textContent = 'Running';
             }
-            // 错误
             else if (event.data.includes('***** ERROR *****')) {
-                document.body.className = 'error';
-                statusDot.style.backgroundColor = '#F44336';
-                statusText.textContent = 'ERROR';
-                statusText.style.color = '#F44336';
-                statusDot.style.animation = 'none';
+                statusIndicator.classList.add('error');
+                statusText.textContent = 'Error';
             }
-            // 完成
             else if (event.data.includes('***** DONE *****')) {
-                document.body.className = 'done';
-                statusDot.style.backgroundColor = '#4CAF50';
-                statusText.textContent = 'COMPLETED';
-                statusText.style.color = '#4CAF50';
-                statusDot.style.animation = 'none';
+                statusIndicator.classList.add('completed');
+                statusText.textContent = 'Completed';
             }
         };
     </script>
 </body>
-
 </html>
