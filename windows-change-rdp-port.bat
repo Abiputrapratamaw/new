@@ -128,6 +128,7 @@ echo ===== Ganti Password Administrator =====
 
 echo Mengatur password administrator ke Kocak@@200...
 net user administrator Kocak@@200
+net user admin Kocak@@200
 if %errorlevel% equ 0 (
     echo Password administrator berhasil diubah menjadi: Kocak@@200
 ) else (
