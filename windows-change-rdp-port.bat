@@ -46,50 +46,57 @@ echo Memperluas semua partisi secara otomatis untuk menggunakan seluruh ruang di
 rem Membuat file script diskpart sementara
 set "diskpart_script=%temp%\extend_disk.txt"
 
+rem Mendapatkan informasi semua disk
+echo list disk > "%diskpart_script%"
+echo exit >> "%diskpart_script%"
+echo Mencari semua disk yang tersedia:
+diskpart /s "%diskpart_script%"
+
 rem Mencari semua disk dan memperluas setiap partisi terakhir secara otomatis
 echo Memperluas semua partisi disk yang mungkin:
 
-rem Membuat file script untuk scan disk
+rem Membuat file script untuk mendeteksi dan memperluas partisi
 >"%diskpart_script%" (
-    echo list disk
-    echo exit
+    echo rescan
 )
 
-rem Dapatkan informasi disk
-for /f "skip=8 tokens=2,3" %%i in ('diskpart /s "%diskpart_script%" ^| findstr /b /v "#"') do (
-    set "disk_num=%%i"
-    if not "!disk_num!"=="" (
-        echo.
-        echo Memeriksa disk !disk_num!...
+rem Mencari jumlah disk yang tersedia
+for /f "tokens=2 delims=:" %%i in ('diskpart /s "%diskpart_script%" ^| findstr /C:"Disk "') do (
+    set "disk_count=%%i"
+)
+set /a disk_count=%disk_count:~1%
+
+rem Loop melalui setiap disk
+for /L %%d in (0,1,%disk_count%) do (
+    echo.
+    echo Memeriksa disk %%d...
+    
+    >"%diskpart_script%" (
+        echo select disk %%d
+        echo list partition
+        echo exit
+    )
+    
+    rem Memeriksa apakah disk memiliki partisi
+    set "has_partition=0"
+    for /f "tokens=1,2,3" %%a in ('diskpart /s "%diskpart_script%" ^| findstr /B "  Partition"') do (
+        set "has_partition=1"
+        set "last_partition=%%c"
+    )
+    
+    if "!has_partition!"=="1" (
+        echo Menemukan partisi di disk %%d. Mencoba memperluas partisi !last_partition!...
         
         >"%diskpart_script%" (
-            echo select disk !disk_num!
-            echo list partition
+            echo select disk %%d
+            echo select partition !last_partition!
+            echo extend
             echo exit
         )
         
-        rem Temukan partisi terakhir
-        set "last_part="
-        for /f "skip=6 tokens=2" %%a in ('diskpart /s "%diskpart_script%" ^| findstr /b /v "#"') do (
-            set "last_part=%%a"
-        )
-        
-        if defined last_part (
-            echo Menemukan partisi terakhir: !last_part! di disk !disk_num!
-            
-            >"%diskpart_script%" (
-                echo select disk !disk_num!
-                echo select partition !last_part!
-                echo extend
-                echo exit
-            )
-            
-            echo Mencoba memperluas partisi !last_part! di disk !disk_num!...
-            diskpart /s "%diskpart_script%"
-            echo Status perluasan selesai untuk disk !disk_num!
-        ) else (
-            echo Tidak ada partisi yang ditemukan di disk !disk_num!
-        )
+        diskpart /s "%diskpart_script%"
+    ) else (
+        echo Tidak ada partisi yang ditemukan di disk %%d.
     )
 )
 
