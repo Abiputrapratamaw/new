@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RDP Installation Logs</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+        :root {
+            --bg-primary: #f4f4f8;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #4a4a68;
+            --accent-green: #2ecc71;
+            --accent-red: #e74c3c;
+            --border-color: #e0e0e6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-secondary);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .logs-header h1 {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            background-color: var(--accent-green);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-badge .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: white;
+            margin-right: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .logs-container {
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            display: flex;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s ease;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry:hover {
+            background-color: rgba(46, 204, 113, 0.05);
+        }
+
+        .log-timestamp {
+            color: var(--text-secondary);
+            margin-right: 15px;
+            min-width: 100px;
+            opacity: 0.7;
+        }
+
+        .log-message {
+            flex-grow: 1;
+        }
+
+        .log-message.info {
+            color: var(--text-primary);
+        }
+
+        .log-message.success {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        .log-message.error {
+            color: var(--accent-red);
+            font-weight: 600;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Scrollbar styling */
+        .logs-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .logs-container::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .logs-container::-webkit-scrollbar-thumb {
+            background: var(--text-secondary);
+            border-radius: 4px;
+        }
+
+        .logs-container::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-green);
+        }
+        
+        .status-badge.error {
+            background-color: var(--accent-red);
+        }
+        
+        .status-badge.completed {
+            background-color: var(--accent-green);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logs-header">
+            <h1>RDP Installation Logs</h1>
+            <div class="status-badge" id="status-indicator">
+                <div class="status-dot"></div>
+                <span id="status-text">Running</span>
+            </div>
+        </div>
+        <div class="logs-container" id="log-container"></div>
+    </div>
+
+    <script
+        src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-d/reconnecting-websocket/1.0.0/reconnecting-websocket.min.js"
+        type="application/javascript"></script>
+
+    <script>
+        const logContainer = document.getElementById('log-container');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        
+        // Set to track already displayed log messages
+        const processedLogs = new Set();
+
+        function formatLogMessage(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Special control message handling
+            if (message.includes('***** START TRANS *****')) {
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-message info">Starting new installation process...</div>
+                    </div>
+                `;
+            } else if (message.includes('***** ERROR *****')) {
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-message error">ERROR: ${message.replace('***** ERROR *****', '').trim()}</div>
+                    </div>
+                `;
+            } else if (message.includes('***** DONE *****')) {
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-message success">Installation completed successfully</div>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-message info">${message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        var ws = new ReconnectingWebSocket('ws://' + location.host + '/');
+        
+        ws.onopen = function () {
+            console.log('WebSocket Connected');
+            // Clear log container when reconnecting
+            logContainer.innerHTML = '';
+            processedLogs.clear();
+            
+            const formattedMessage = formatLogMessage('WebSocket Connected.');
+            logContainer.innerHTML += formattedMessage;
+            statusIndicator.classList.remove('error', 'completed');
+            statusText.textContent = 'Running';
+            statusIndicator.style.backgroundColor = '';
+        };
+        
+        ws.onclose = function () {
+            console.log('WebSocket Disconnected');
+            const formattedMessage = formatLogMessage('WebSocket Disconnected.');
+            logContainer.innerHTML += formattedMessage;
+        };
+        
+        ws.onmessage = function (event) {
+            // Check if we've already processed this log message
+            const logHash = Date.now() + '-' + event.data;
+            
+            if (!processedLogs.has(logHash)) {
+                processedLogs.add(logHash);
+                
+                const formattedMessage = formatLogMessage(event.data);
+                logContainer.innerHTML += formattedMessage;
+                
+                // Auto-scroll to bottom
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+                // Status updates
+                if (event.data.includes('***** START TRANS *****')) {
+                    // New transaction - we could optionally clear the log here
+                    // logContainer.innerHTML = '';
+                    // processedLogs.clear();
+                    
+                    statusIndicator.classList.remove('error');
+                    statusIndicator.classList.remove('completed');
+                    statusText.textContent = 'Running';
+                    statusIndicator.style.backgroundColor = '';
+                }
+                else if (event.data.includes('***** ERROR *****')) {
+                    statusIndicator.classList.add('error');
+                    statusIndicator.classList.remove('completed');
+                    statusText.textContent = 'Error';
+                }
+                else if (event.data.includes('***** DONE *****')) {
+                    statusIndicator.classList.remove('error');
+                    statusIndicator.classList.add('completed');
+                    statusText.textContent = 'Completed';
+                }
+            }
+        };
+        
+        // Cleanup processedLogs periodically to prevent memory leak
+        setInterval(() => {
+            // Keep only the last 1000 logs
+            if (processedLogs.size > 1000) {
+                const logsArray = Array.from(processedLogs);
+                const logsToRemove = logsArray.slice(0, logsArray.length - 1000);
+                
+                logsToRemove.forEach(log => {
+                    processedLogs.delete(log);
+                });
+            }
+        }, 60000); // Cleanup every minute
+    </script>
+</body>
+</html>
