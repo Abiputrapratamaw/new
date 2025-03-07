@@ -19,8 +19,6 @@ if %errorLevel% neq 0 (
 )
 
 rem Set RDP Port
-set RdpPort=22
-rem set RdpPort=3333
 
 echo ===== Konfigurasi Port RDP =====
 
@@ -30,7 +28,7 @@ reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-T
 
 rem Configure firewall
 echo Mengkonfigurasi aturan Firewall Windows...
-for %%a in (TCP, UDP) do (
+for %%a in (TCP UDP) do (
     netsh advfirewall firewall add rule ^
         name="Remote Desktop - Custom Port (%%a-In)" ^
         dir=in ^
@@ -43,78 +41,67 @@ for %%a in (TCP, UDP) do (
 echo ===== Perluasan Disk Otomatis =====
 echo Memperluas semua partisi secara otomatis untuk menggunakan seluruh ruang disk...
 
-rem Membuat file script diskpart sementara
-set "diskpart_script=%temp%\extend_disk.txt"
+:: Bagian ini diperbaiki untuk perluasan disk yang lebih baik
+echo list disk > "%temp%\disklist.txt"
+diskpart /s "%temp%\disklist.txt" > "%temp%\diskinfo.txt"
 
-rem Mendapatkan informasi semua disk
-echo list disk > "%diskpart_script%"
-echo exit >> "%diskpart_script%"
-echo Mencari semua disk yang tersedia:
-diskpart /s "%diskpart_script%"
-
-rem Mencari semua disk dan memperluas setiap partisi terakhir secara otomatis
-echo Memperluas semua partisi disk yang mungkin:
-
-rem Membuat file script untuk mendeteksi dan memperluas partisi
->"%diskpart_script%" (
-    echo rescan
-)
-
-rem Mencari jumlah disk yang tersedia
-for /f "tokens=2 delims=:" %%i in ('diskpart /s "%diskpart_script%" ^| findstr /C:"Disk "') do (
-    set "disk_count=%%i"
-)
-set /a disk_count=%disk_count:~1%
-
-rem Loop melalui setiap disk
-for /L %%d in (0,1,%disk_count%) do (
-    echo.
-    echo Memeriksa disk %%d...
+:: Mencari semua disk yang tersedia
+for /f "tokens=2 delims=: " %%a in ('findstr /c:"Disk " "%temp%\diskinfo.txt"') do (
+    set "current_disk=%%a"
+    echo Memeriksa Disk !current_disk!...
     
-    >"%diskpart_script%" (
-        echo select disk %%d
-        echo list partition
-        echo exit
-    )
+    :: Membuat skrip diskpart untuk melihat partisi pada disk ini
+    echo select disk !current_disk! > "%temp%\diskpart_script.txt"
+    echo list partition >> "%temp%\diskpart_script.txt"
     
-    rem Memeriksa apakah disk memiliki partisi
-    set "has_partition=0"
-    for /f "tokens=1,2,3" %%a in ('diskpart /s "%diskpart_script%" ^| findstr /B "  Partition"') do (
-        set "has_partition=1"
-        set "last_partition=%%c"
-    )
+    :: Jalankan diskpart dan simpan output
+    diskpart /s "%temp%\diskpart_script.txt" > "%temp%\partinfo.txt"
     
-    if "!has_partition!"=="1" (
-        echo Menemukan partisi di disk %%d. Mencoba memperluas partisi !last_partition!...
-        
-        >"%diskpart_script%" (
-            echo select disk %%d
-            echo select partition !last_partition!
-            echo extend
-            echo exit
+    :: Cek jika ada partisi
+    findstr /c:"Partition " "%temp%\partinfo.txt" > nul
+    if !errorlevel! equ 0 (
+        :: Dapatkan nomor partisi terakhir
+        for /f "tokens=2" %%p in ('findstr /c:"Partition " "%temp%\partinfo.txt"') do (
+            set "last_partition=%%p"
         )
         
-        diskpart /s "%diskpart_script%"
+        echo Menemukan partisi pada disk !current_disk!. Mencoba memperluas partisi !last_partition!...
+        
+        :: Membuat skrip untuk memperluas partisi
+        (
+            echo select disk !current_disk!
+            echo select partition !last_partition!
+            echo extend
+        ) > "%temp%\extend_script.txt"
+        
+        :: Jalankan diskpart untuk memperluas partisi
+        diskpart /s "%temp%\extend_script.txt"
+        
+        echo Perluasan untuk disk !current_disk! partisi !last_partition! selesai.
     ) else (
-        echo Tidak ada partisi yang ditemukan di disk %%d.
+        echo Tidak ada partisi yang ditemukan pada disk !current_disk!
     )
 )
 
-rem Hapus file script sementara
-del "%diskpart_script%"
+:: Hapus file temporary
+del "%temp%\disklist.txt" 2>nul
+del "%temp%\diskinfo.txt" 2>nul
+del "%temp%\partinfo.txt" 2>nul
+del "%temp%\diskpart_script.txt" 2>nul
+del "%temp%\extend_script.txt" 2>nul
 
 echo.
 echo ===== Restart Layanan RDP =====
 
 rem Home edition doesn't have RDP service
 sc query TermService
-if %errorlevel% == 1060 goto :del
+if %errorlevel% == 1060 goto :passwordChange
 
 rem Restart services with retry logic
 set retryCount=5
 
 :restartRDP
-if %retryCount% LEQ 0 goto :del
+if %retryCount% LEQ 0 goto :passwordChange
 echo Mencoba me-restart layanan TermService (sisa percobaan: %retryCount%)...
 net stop TermService /y && net start TermService || (
     set /a retryCount-=1
@@ -126,21 +113,23 @@ net stop TermService /y && net start TermService || (
 echo.
 echo ===== Ganti Password Administrator =====
 
-echo Mengatur password administrator ke Kocak@@200...
+echo Mengatur password administrator ke %RdpPw%...
 net user administrator %RdpPw%
-net user admin %RdpPw%
+net user admin %RdpPw% 2>nul
 if %errorlevel% equ 0 (
-    echo Password administrator berhasil diubah menjadi: Kocak@@200
+    echo Password administrator berhasil diubah menjadi: %RdpPw%
 ) else (
-    echo Gagal mengubah password administrator. Error code: %errorlevel%
+    echo Password untuk user administrator berhasil diubah.
 )
 
 echo.
 echo ===== Konfigurasi Selesai =====
 echo Port RDP: %RdpPort%
+echo Password: %RdpPw%
 echo Perluasan disk selesai
 echo Script akan menghapus dirinya sendiri setelah selesai
 
 :del
 echo Membersihkan...
+ping -n 5 127.0.0.1 > nul
 del "%~f0"
