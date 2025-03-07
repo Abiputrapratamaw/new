@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RDP Installation Logs</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+        :root {
+            --bg-primary: #f4f4f8;
+            --bg-secondary: #ffffff;
+            --text-primary: #1a1a2e;
+            --text-secondary: #4a4a68;
+            --accent-green: #2ecc71;
+            --accent-red: #e74c3c;
+            --border-color: #e0e0e6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-secondary);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .logs-header h1 {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            background-color: var(--accent-green);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-badge .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: white;
+            margin-right: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .logs-container {
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            display: flex;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.3s ease;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry:hover {
+            background-color: rgba(46, 204, 113, 0.05);
+        }
+
+        .log-timestamp {
+            color: var(--text-secondary);
+            margin-right: 15px;
+            min-width: 100px;
+            opacity: 0.7;
+        }
+
+        .log-message {
+            flex-grow: 1;
+        }
+
+        .log-message.info {
+            color: var(--text-primary);
+        }
+
+        .log-message.success {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        .log-message.error {
+            color: var(--accent-red);
+            font-weight: 600;
+        }
+
+        .status-badge.error {
+            background-color: var(--accent-red);
+        }
+        
+        .status-badge.completed {
+            background-color: var(--accent-green);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .control-button {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .control-button:hover {
+            background-color: var(--bg-primary);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Scrollbar styling */
+        .logs-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .logs-container::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .logs-container::-webkit-scrollbar-thumb {
+            background: var(--text-secondary);
+            border-radius: 4px;
+        }
+
+        .logs-container::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-green);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logs-header">
+            <h1>RDP Installation Logs</h1>
+            <div class="status-badge" id="status-indicator">
+                <div class="status-dot"></div>
+                <span id="status-text">Running</span>
+            </div>
+        </div>
+        <div class="controls">
+            <div>
+                <button class="control-button" id="reload-logs">Muat Ulang Log</button>
+                <button class="control-button" id="clear-logs">Hapus Semua Log</button>
+            </div>
+            <div>
+                <button class="control-button" id="toggle-updates">Auto-update: ON</button>
+                <button class="control-button" id="toggle-autoscroll">Auto-scroll: ON</button>
+            </div>
+        </div>
+        <div class="logs-container" id="log-container"></div>
+    </div>
+
+    <script
+        src="https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-d/reconnecting-websocket/1.0.0/reconnecting-websocket.min.js"
+        type="application/javascript"></script>
+
+    <script>
+        // Elemen DOM
+        const logContainer = document.getElementById('log-container');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const clearLogsBtn = document.getElementById('clear-logs');
+        const reloadLogsBtn = document.getElementById('reload-logs');
+        const toggleAutoScrollBtn = document.getElementById('toggle-autoscroll');
+        const toggleUpdatesBtn = document.getElementById('toggle-updates');
+        
+        // Variabel untuk tracking
+        let isAutoScrollEnabled = true;
+        let isAutoUpdateEnabled = true;
+        let lastProcessedLogLine = 0;
+        let currentStatus = 'running';
+        let pollingInterval = null;
+        
+        // Format timestamp untuk log
+        function getFormattedTime() {
+            const now = new Date();
+            return now.toLocaleTimeString('id-ID', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false 
+            });
+        }
+        
+        // Buat log entry dengan format yang sesuai
+        function createLogEntry(message, timestamp = getFormattedTime()) {            
+            // Handle pesan khusus
+            if (message.includes('***** START TRANS *****')) {
+                return {
+                    html: `
+                        <div class="log-entry">
+                            <div class="log-timestamp">${timestamp}</div>
+                            <div class="log-message info">Starting new installation process...</div>
+                        </div>
+                    `,
+                    type: 'start'
+                };
+            } else if (message.includes('***** ERROR *****')) {
+                return {
+                    html: `
+                        <div class="log-entry">
+                            <div class="log-timestamp">${timestamp}</div>
+                            <div class="log-message error">ERROR: ${message.replace('***** ERROR *****', '').trim()}</div>
+                        </div>
+                    `,
+                    type: 'error'
+                };
+            } else if (message.includes('***** DONE *****')) {
+                return {
+                    html: `
+                        <div class="log-entry">
+                            <div class="log-timestamp">${timestamp}</div>
+                            <div class="log-message success">Installation completed successfully</div>
+                        </div>
+                    `,
+                    type: 'done'
+                };
+            } else {
+                return {
+                    html: `
+                        <div class="log-entry">
+                            <div class="log-timestamp">${timestamp}</div>
+                            <div class="log-message info">${message}</div>
+                        </div>
+                    `,
+                    type: 'info'
+                };
+            }
+        }
+        
+        // Tambahkan log ke container
+        function appendLog(message) {
+            const logEntry = createLogEntry(message);
+            
+            // Tambahkan log baru ke container
+            logContainer.insertAdjacentHTML('beforeend', logEntry.html);
+            
+            // Auto-scroll ke bawah jika diaktifkan
+            if (isAutoScrollEnabled) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+            
+            // Update status indikator
+            updateStatusIndicator(logEntry.type);
+        }
+        
+        // Update status indikator
+        function updateStatusIndicator(type) {
+            if (type === 'start') {
+                statusIndicator.classList.remove('error', 'completed');
+                statusText.textContent = 'Running';
+                currentStatus = 'running';
+            } else if (type === 'error') {
+                statusIndicator.classList.add('error');
+                statusIndicator.classList.remove('completed');
+                statusText.textContent = 'Error';
+                currentStatus = 'error';
+            } else if (type === 'done') {
+                statusIndicator.classList.remove('error');
+                statusIndicator.classList.add('completed');
+                statusText.textContent = 'Completed';
+                currentStatus = 'completed';
+            }
+        }
+        
+        // Ambil isi file log
+        async function fetchLogFile() {
+            try {
+                const response = await fetch('/reinstall.log');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const text = await response.text();
+                return text;
+            } catch (error) {
+                console.error('Error fetching log file:', error);
+                appendLog(`Error fetching log file: ${error.message}`);
+                return null;
+            }
+        }
+        
+        // Proses file log
+        function processLogContent(content, isInitialLoad = false) {
+            if (!content) return;
+            
+            // Split log menjadi baris-baris
+            const lines = content.split('\n');
+            
+            // Jika ini adalah initial load dan ada log START, kosongkan container
+            if (isInitialLoad) {
+                const startIndex = lines.findIndex(line => line.includes('***** START TRANS *****'));
+                if (startIndex >= 0) {
+                    // Jika ada START TRANS, ambil hanya dari situ
+                    lastProcessedLogLine = startIndex;
+                    logContainer.innerHTML = '';
+                }
+            }
+            
+            // Proses baris baru saja (setelah lastProcessedLogLine)
+            for (let i = lastProcessedLogLine; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line) {
+                    appendLog(line);
+                }
+            }
+            
+            // Update lastProcessedLogLine
+            lastProcessedLogLine = lines.length - 1;
+        }
+        
+        // Polling untuk update log
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // Lakukan polling setiap 1 detik
+            pollingInterval = setInterval(async () => {
+                if (!isAutoUpdateEnabled) return;
+                
+                const logContent = await fetchLogFile();
+                processLogContent(logContent);
+            }, 1000);
+        }
+        
+        // Inisialisasi log viewer
+        async function initLogViewer() {
+            // Ambil log saat pertama kali load
+            const initialLogContent = await fetchLogFile();
+            
+            if (initialLogContent) {
+                processLogContent(initialLogContent, true);
+                startPolling();
+            } else {
+                appendLog('Error: Unable to load log file.');
+            }
+        }
+        
+        // Mulai inisialisasi
+        initLogViewer();
+        
+        // ===== EVENT LISTENERS =====
+        
+        // Tombol Clear Logs
+        clearLogsBtn.addEventListener('click', function() {
+            logContainer.innerHTML = '';
+            lastProcessedLogLine = 0;
+        });
+        
+        // Tombol Reload Logs
+        reloadLogsBtn.addEventListener('click', async function() {
+            logContainer.innerHTML = '';
+            lastProcessedLogLine = 0;
+            const logContent = await fetchLogFile();
+            processLogContent(logContent, true);
+        });
+        
+        // Toggle Auto-scroll
+        toggleAutoScrollBtn.addEventListener('click', function() {
+            isAutoScrollEnabled = !isAutoScrollEnabled;
+            toggleAutoScrollBtn.textContent = `Auto-scroll: ${isAutoScrollEnabled ? 'ON' : 'OFF'}`;
+        });
+        
+        // Toggle Auto-update
+        toggleUpdatesBtn.addEventListener('click', function() {
+            isAutoUpdateEnabled = !isAutoUpdateEnabled;
+            toggleUpdatesBtn.textContent = `Auto-update: ${isAutoUpdateEnabled ? 'ON' : 'OFF'}`;
+        });
+        
+        // Deteksi scroll manual
+        logContainer.addEventListener('scroll', function() {
+            // Jika user scroll up, matikan auto-scroll
+            if (logContainer.scrollTop < logContainer.scrollHeight - logContainer.clientHeight - 50) {
+                if (isAutoScrollEnabled) {
+                    isAutoScrollEnabled = false;
+                    toggleAutoScrollBtn.textContent = 'Auto-scroll: OFF';
+                }
+            }
+        });
+        
+        // Untuk backup, masih tetap gunakan WebSocket tapi hanya untuk command
+        let ws = new ReconnectingWebSocket('ws://' + location.host + '/');
+        
+        ws.onopen = function () {
+            appendLog('WebSocket Connected.');
+        };
+        
+        ws.onclose = function () {
+            appendLog('WebSocket Disconnected.');
+        };
+        
+        ws.onmessage = function (event) {
+            // WebSocket hanya digunakan untuk trigger refresh file log
+            if (event.data.includes('***** START TRANS *****')) {
+                // Reload log dari awal
+                logContainer.innerHTML = '';
+                lastProcessedLogLine = 0;
+                fetchLogFile().then(content => processLogContent(content, true));
+            }
+        };
+    </script>
+</body>
+</html>
