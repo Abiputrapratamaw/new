@@ -1,15 +1,3 @@
-rem set mac_addr=11:22:33:aa:bb:cc
-
-rem set ipv4_addr=192.168.1.2/24
-rem set ipv4_gateway=192.168.1.1
-rem set ipv4_dns1=192.168.1.1
-rem set ipv4_dns2=192.168.1.2
-
-rem set ipv6_addr=2222::2/64
-rem set ipv6_gateway=2222::1
-rem set ipv6_dns1=::1
-rem set ipv6_dns2=::2
-
 @echo off
 mode con cp select=437 >nul
 setlocal EnableDelayedExpansion
@@ -34,8 +22,13 @@ echo.
 echo Memperluas partisi disk untuk menggunakan seluruh ruang yang tersedia...
 echo.
 
-set systemDisk=%SystemDrive:~0,1%
-for /f "tokens=2" %%d in ('echo list vol ^| diskpart ^| findstr "\<%systemDisk%\>"') do (echo select disk 0 & echo select vol %%d & echo extend) | diskpart
+rem Metode extend disk yang lebih robust
+for /f "tokens=2" %%a in ('echo list vol ^| diskpart ^| findstr "\<C\>"') do (
+    (
+        echo select volume %%a
+        echo extend
+    ) | diskpart
+)
 
 echo.
 echo Konfigurasi disk selesai.
@@ -104,6 +97,11 @@ if defined mac_addr (
 
 echo.
 echo Konfigurasi selesai.
+echo.
+
+rem Menampilkan informasi disk (opsional)
+wmic logicaldisk where deviceid="C:" get size,freespace
+
 echo.
 echo Script ini akan dihapus dalam 5 detik...
 timeout /t 5 >nul
