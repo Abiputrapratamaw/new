@@ -18,18 +18,6 @@ if %errorLevel% neq 0 (
     exit /B
 )
 
-:computerNameChange
-echo.
-echo ===== Ganti Nama Komputer =====
-
-echo Mengubah nama komputer menjadi AVOLA...
-wmic computersystem where name="%computername%" call rename name="AVOLA"
-if %errorlevel% equ 0 (
-    echo Nama komputer berhasil diubah menjadi AVOLA
-) else (
-    echo Gagal mengubah nama komputer. Error code: %errorlevel%
-)
-
 rem Set RDP Port
 set RdpPort=22
 rem set RdpPort=3333
