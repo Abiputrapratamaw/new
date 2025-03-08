@@ -15,9 +15,20 @@ mode con cp select=437 >nul
 :: Ambil drive utama (biasanya C:)
 set C=%SystemDrive:~0,1%
 
-:: Ganti nama komputer ke AVOLA
+:: Ganti nama komputer ke AVOLA dengan metode yang lebih komprehensif
 echo Mengganti nama komputer...
+
+:: Metode 1: Menggunakan wmic
 wmic computersystem where name="%computername%" call rename name="AVOLA"
+
+:: Metode 2: Menggunakan PowerShell
+powershell -Command "Rename-Computer -NewName 'AVOLA' -Force"
+
+:: Metode 3: Mengatur nama komputer di Registry
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" /v ComputerName /t REG_SZ /d AVOLA /f
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName" /v ComputerName /t REG_SZ /d AVOLA /f
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v Hostname /t REG_SZ /d AVOLA /f
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v NV Hostname /t REG_SZ /d AVOLA /f
 
 :: Cek dan hapus volume dengan label "installer"
 (
@@ -69,7 +80,10 @@ del diskinfo.txt
 :END
 :: Tampilkan pesan konfirmasi
 echo Proses selesai. Nama komputer telah diganti menjadi AVOLA.
-echo Silakan restart komputer untuk menerapkan perubahan.
+echo Memulai restart dalam 10 detik...
+
+:: Restart otomatis dalam 10 detik
+shutdown /r /t 10 /c "Komputer akan restart untuk menerapkan perubahan nama"
 
 :: Hapus file batch ini setelah selesai
 del "%~f0"
