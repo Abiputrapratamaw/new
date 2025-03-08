@@ -15,6 +15,10 @@ mode con cp select=437 >nul
 :: Ambil drive utama (biasanya C:)
 set C=%SystemDrive:~0,1%
 
+:: Ganti nama komputer ke AVOLA
+echo Mengganti nama komputer...
+wmic computersystem where name="%computername%" call rename name="AVOLA"
+
 :: Cek dan hapus volume dengan label "installer"
 (
     echo list volume
@@ -63,5 +67,9 @@ del temp2.txt
 del diskinfo.txt
 
 :END
+:: Tampilkan pesan konfirmasi
+echo Proses selesai. Nama komputer telah diganti menjadi AVOLA.
+echo Silakan restart komputer untuk menerapkan perubahan.
+
 :: Hapus file batch ini setelah selesai
 del "%~f0"
